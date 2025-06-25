@@ -42,9 +42,19 @@ export class ESPHomeDataTable extends LitElement {
   @property() public noDataText = "No data";
   @property() public id = "id";
   @property({ attribute: false }) public hiddenColumns?: string[];
+  @property({ attribute: false }) public groupColumn?: string;
+  @property({ attribute: false }) public groupOrder?: string[];
+  @property({ attribute: false }) public initialCollapsedGroups?: string[];
   @state() private _sortColumn?: string;
   @state() private _sortDirection?: "asc" | "desc" | null = null;
   @state() private _selectedRows = new Set<string>();
+  @state() private _collapsedGroups: string[] = [];
+  @state() private _filter = "";
+  
+  private _debounceFilter = debounce((value: string) => {
+    this._filter = value;
+    this.requestUpdate();
+  }, 300);
 
   private _handleSort(column: DataTableColumn) {
     if (!column.sortable) return;
@@ -83,7 +93,7 @@ export class ESPHomeDataTable extends LitElement {
     if (this.clickable) {
       this.dispatchEvent(
         new CustomEvent("row-click", {
-          detail: { id: row[this.id] },
+          detail: { id: row[this.id], row },
           bubbles: true,
           composed: true,
         })
@@ -139,8 +149,9 @@ export class ESPHomeDataTable extends LitElement {
     let filtered = [...this.data];
 
     // Apply filter
-    if (this.filter) {
-      const filterLower = this.filter.toLowerCase();
+    const filterValue = this.filter || this._filter;
+    if (filterValue) {
+      const filterLower = filterValue.toLowerCase();
       filtered = filtered.filter((row) =>
         Object.values(row).some((value) =>
           String(value).toLowerCase().includes(filterLower)
@@ -180,6 +191,10 @@ export class ESPHomeDataTable extends LitElement {
   }
 
   protected render() {
+    if (this.groupColumn) {
+      return this._renderGroupedTable();
+    }
+    
     const filteredData = this._getFilteredData();
 
     if (filteredData.length === 0) {
@@ -229,12 +244,9 @@ export class ESPHomeDataTable extends LitElement {
                       <span class="header-text">${column.title}</span>
                       ${column.sortable && this._sortColumn === column.key
                         ? html`
-                            <ha-svg-icon
-                              class="sort-icon"
-                              .path=${this._sortDirection === "desc"
-                                ? "M7 10l5 5 5-5"
-                                : "M7 14l5-5 5 5"}
-                            ></ha-svg-icon>
+                            <mwc-icon class="sort-icon">
+                              ${this._sortDirection === "desc" ? "arrow_downward" : "arrow_upward"}
+                            </mwc-icon>
                           `
                         : nothing}
                     </div>
@@ -296,6 +308,144 @@ export class ESPHomeDataTable extends LitElement {
             )}
           </tbody>
         </table>
+      </div>
+    `;
+  }
+
+  private _renderGroupedTable() {
+    const groupedData = this._getGroupedData();
+    const groupKeys = Object.keys(groupedData);
+
+    if (groupKeys.length === 0) {
+      return html`
+        <div class="no-data">
+          <p>${this.noDataText}</p>
+        </div>
+      `;
+    }
+
+    return html`
+      <div class="grouped-table-wrapper">
+        ${groupKeys.map(groupKey => {
+          const isCollapsed = this._collapsedGroups.includes(groupKey);
+          const groupRows = groupedData[groupKey];
+          
+          return html`
+            <div class="group-section">
+              <div class="group-header" @click=${() => this._toggleGroup(groupKey)}>
+                <mwc-icon class="expand-icon ${classMap({ collapsed: isCollapsed })}">
+                  ${isCollapsed ? "expand_more" : "expand_less"}
+                </mwc-icon>
+                <span class="group-title">${groupKey} (${groupRows.length})</span>
+              </div>
+              ${!isCollapsed ? html`
+                <div class="table-wrapper ${classMap({ narrow: this.narrow })}">
+                  <table>
+                    <thead>
+                      <tr>
+                        ${this.selectable
+                          ? html`
+                              <th class="checkbox-cell">
+                                <input
+                                  type="checkbox"
+                                  .checked=${this._isAllSelected()}
+                                  .indeterminate=${this._isSomeSelected()}
+                                  @change=${this._handleSelectAll}
+                                  aria-label="Select all"
+                                />
+                              </th>
+                            `
+                          : nothing}
+                        ${this._visibleColumns.map(
+                          (column) => html`
+                            <th
+                              class=${classMap({
+                                sortable: !!column.sortable,
+                                sorted: this._sortColumn === column.key,
+                                [column.align || "left"]: true,
+                                [column.type || ""]: true,
+                              })}
+                              style=${styleMap({
+                                width: column.width || "auto",
+                                minWidth: column.minWidth || "auto",
+                                maxWidth: column.maxWidth || "none",
+                                flex: column.flex ? String(column.flex) : "auto",
+                              })}
+                              @click=${() => this._handleSort(column)}
+                            >
+                              <div class="header-content">
+                                <span class="header-text">${column.title}</span>
+                                ${column.sortable && this._sortColumn === column.key
+                                  ? html`
+                                      <mwc-icon class="sort-icon">
+                                        ${this._sortDirection === "desc" ? "arrow_downward" : "arrow_upward"}
+                                      </mwc-icon>
+                                    `
+                                  : nothing}
+                              </div>
+                            </th>
+                          `
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${repeat(
+                        groupRows,
+                        (row) => row.id || row.name || JSON.stringify(row),
+                        (row) => html`
+                          <tr
+                            class=${classMap({ 
+                              clickable: this.clickable,
+                              selected: this._selectedRows.has(row[this.id])
+                            })}
+                            @click=${(e: Event) => this._handleRowClick(row, e)}
+                          >
+                            ${this.selectable
+                              ? html`
+                                  <td class="checkbox-cell">
+                                    ${row.selectable !== false
+                                      ? html`
+                                          <input
+                                            type="checkbox"
+                                            .checked=${this._selectedRows.has(row[this.id])}
+                                            @change=${(e: Event) => 
+                                              this._handleRowSelection(row, (e.target as HTMLInputElement).checked)
+                                            }
+                                            aria-label="Select row"
+                                          />
+                                        `
+                                      : nothing}
+                                  </td>
+                                `
+                              : nothing}
+                            ${this._visibleColumns.map((column) => {
+                              const value = row[column.key];
+                              const content = column.template
+                                ? column.template(value, row)
+                                : value;
+
+                              return html`
+                                <td class="${classMap({
+                                  [column.align || "left"]: true,
+                                  [column.type || ""]: true,
+                                })}">
+                                  <div class="cell-content">
+                                    ${content}
+                                    ${column.extraTemplate ? column.extraTemplate(value, row) : nothing}
+                                  </div>
+                                </td>
+                              `;
+                            })}
+                          </tr>
+                        `
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ` : nothing}
+            </div>
+          `;
+        })}
       </div>
     `;
   }
@@ -395,10 +545,10 @@ export class ESPHomeDataTable extends LitElement {
       flex-shrink: 0;
     }
 
-    ha-svg-icon {
+    mwc-icon {
       display: inline-flex;
-      width: 24px;
-      height: 24px;
+      width: 18px;
+      height: 18px;
     }
 
     tbody tr {
@@ -500,6 +650,51 @@ export class ESPHomeDataTable extends LitElement {
       background: var(--esphome-text-secondary);
     }
 
+    /* Grouped table styles */
+    .grouped-table-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: var(--esphome-spacing-m);
+    }
+
+    .group-section {
+      background: var(--esphome-table-background);
+      border-radius: var(--esphome-border-radius);
+      box-shadow: var(--esphome-box-shadow);
+      overflow: hidden;
+    }
+
+    .group-header {
+      display: flex;
+      align-items: center;
+      gap: var(--esphome-spacing-s);
+      padding: var(--esphome-spacing-m) var(--esphome-spacing-l);
+      background: var(--esphome-table-header-background);
+      border-bottom: 1px solid var(--esphome-border-color);
+      cursor: pointer;
+      transition: background-color var(--esphome-transition-duration) var(--esphome-transition-timing);
+    }
+
+    .group-header:hover {
+      background: var(--esphome-hover-background);
+    }
+
+    .expand-icon {
+      color: var(--esphome-text-secondary);
+      transition: transform var(--esphome-transition-duration) var(--esphome-transition-timing);
+    }
+
+    .expand-icon.collapsed {
+      transform: rotate(-90deg);
+    }
+
+    .group-title {
+      font-size: var(--esphome-font-size-m);
+      font-weight: var(--esphome-font-weight-medium);
+      color: var(--esphome-text-primary);
+      text-transform: capitalize;
+    }
+
     /* Responsive */
     @media (max-width: 768px) {
       :host {
@@ -533,6 +728,34 @@ export class ESPHomeDataTable extends LitElement {
     if (changedProperties.has('filter') && this.filter !== this._filter) {
       this._debounceFilter(this.filter);
     }
+  }
+
+  private _getGroupedData(): Record<string, DataTableRow[]> {
+    if (!this.groupColumn) {
+      return {};
+    }
+
+    const filtered = this._getFilteredData();
+    const grouped: Record<string, DataTableRow[]> = {};
+
+    filtered.forEach((row) => {
+      const groupValue = String(row[this.groupColumn!] || 'Other');
+      if (!grouped[groupValue]) {
+        grouped[groupValue] = [];
+      }
+      grouped[groupValue].push(row);
+    });
+
+    return grouped;
+  }
+
+  private _toggleGroup(groupKey: string) {
+    if (this._collapsedGroups.includes(groupKey)) {
+      this._collapsedGroups = this._collapsedGroups.filter(g => g !== groupKey);
+    } else {
+      this._collapsedGroups = [...this._collapsedGroups, groupKey];
+    }
+    this.requestUpdate();
   }
 }
 
