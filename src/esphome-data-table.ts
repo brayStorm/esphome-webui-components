@@ -1,19 +1,33 @@
-import { LitElement, html, css, TemplateResult } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { LitElement, html, css, TemplateResult, nothing, PropertyValues } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { classMap } from "lit/directives/class-map.js";
+import { styleMap } from "lit/directives/style-map.js";
+import { haTheme, haCommonStyles } from "./ha-theme.js";
+import { debounce } from "./utils.js";
 
 export interface DataTableColumn {
   key: string;
   title: string;
+  label?: string;
   sortable?: boolean;
+  filterable?: boolean;
+  groupable?: boolean;
+  hidden?: boolean;
   width?: string;
+  minWidth?: string;
+  maxWidth?: string;
+  flex?: number;
   align?: "left" | "center" | "right";
-  template?: (value: any, row: any) => TemplateResult | string;
+  type?: "numeric" | "icon" | "icon-button" | "overflow-menu";
+  template?: (value: any, row: any) => TemplateResult | string | typeof nothing;
+  extraTemplate?: (value: any, row: any) => TemplateResult | string | typeof nothing;
 }
 
 export interface DataTableRow {
   [key: string]: any;
+  id?: string;
+  selectable?: boolean;
 }
 
 @customElement("esphome-data-table")
@@ -22,15 +36,28 @@ export class ESPHomeDataTable extends LitElement {
   @property({ attribute: false }) public data: DataTableRow[] = [];
   @property() public filter = "";
   @property({ type: Boolean }) public clickable = false;
+  @property({ type: Boolean }) public selectable = false;
+  @property({ type: Boolean }) public narrow = false;
+  @property({ type: Boolean, attribute: "auto-height" }) public autoHeight = false;
   @property() public noDataText = "No data";
-  @property() private _sortColumn?: string;
-  @property() private _sortDirection?: "asc" | "desc";
+  @property() public id = "id";
+  @property({ attribute: false }) public hiddenColumns?: string[];
+  @state() private _sortColumn?: string;
+  @state() private _sortDirection?: "asc" | "desc" | null = null;
+  @state() private _selectedRows = new Set<string>();
 
   private _handleSort(column: DataTableColumn) {
     if (!column.sortable) return;
 
     if (this._sortColumn === column.key) {
-      this._sortDirection = this._sortDirection === "asc" ? "desc" : "asc";
+      if (this._sortDirection === "asc") {
+        this._sortDirection = "desc";
+      } else if (this._sortDirection === "desc") {
+        this._sortDirection = null;
+        this._sortColumn = undefined;
+      } else {
+        this._sortDirection = "asc";
+      }
     } else {
       this._sortColumn = column.key;
       this._sortDirection = "asc";
@@ -45,15 +72,66 @@ export class ESPHomeDataTable extends LitElement {
     );
   }
 
-  private _handleRowClick(row: DataTableRow) {
-    if (!this.clickable) return;
+  private _handleRowClick(row: DataTableRow, event: Event) {
+    if (!this.clickable && !this.selectable) return;
+    
+    const checkbox = event.composedPath()[0] as HTMLElement;
+    if (checkbox.tagName === "INPUT" && checkbox.getAttribute("type") === "checkbox") {
+      return;
+    }
+    
+    if (this.clickable) {
+      this.dispatchEvent(
+        new CustomEvent("row-click", {
+          detail: { id: row[this.id] },
+          bubbles: true,
+          composed: true,
+        })
+      );
+    }
+  }
+
+  private _handleRowSelection(row: DataTableRow, checked: boolean) {
+    const rowId = row[this.id];
+    if (checked) {
+      this._selectedRows.add(rowId);
+    } else {
+      this._selectedRows.delete(rowId);
+    }
+    this.requestUpdate();
     
     this.dispatchEvent(
-      new CustomEvent("row-click", {
-        detail: { row },
+      new CustomEvent("selection-changed", {
+        detail: { value: Array.from(this._selectedRows) },
         bubbles: true,
         composed: true,
       })
+    );
+  }
+
+  private _handleSelectAll(event: Event) {
+    const checkbox = event.target as HTMLInputElement;
+    const selectableRows = this._getFilteredData().filter(row => row.selectable !== false);
+    
+    if (checkbox.checked) {
+      selectableRows.forEach(row => this._selectedRows.add(row[this.id]));
+    } else {
+      this._selectedRows.clear();
+    }
+    this.requestUpdate();
+    
+    this.dispatchEvent(
+      new CustomEvent("selection-changed", {
+        detail: { value: Array.from(this._selectedRows) },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private get _visibleColumns() {
+    return this.columns.filter(col => 
+      !col.hidden && (!this.hiddenColumns || !this.hiddenColumns.includes(col.key))
     );
   }
 
@@ -92,6 +170,15 @@ export class ESPHomeDataTable extends LitElement {
     return filtered;
   }
 
+  private _isAllSelected(): boolean {
+    const selectableRows = this._getFilteredData().filter(row => row.selectable !== false);
+    return selectableRows.length > 0 && selectableRows.every(row => this._selectedRows.has(row[this.id]));
+  }
+
+  private _isSomeSelected(): boolean {
+    return this._selectedRows.size > 0 && !this._isAllSelected();
+  }
+
   protected render() {
     const filteredData = this._getFilteredData();
 
@@ -104,42 +191,52 @@ export class ESPHomeDataTable extends LitElement {
     }
 
     return html`
-      <div class="table-wrapper">
+      <div class="table-wrapper ${classMap({ narrow: this.narrow })}">
         <table>
           <thead>
             <tr>
-              ${this.columns.map(
+              ${this.selectable
+                ? html`
+                    <th class="checkbox-cell">
+                      <input
+                        type="checkbox"
+                        .checked=${this._isAllSelected()}
+                        .indeterminate=${this._isSomeSelected()}
+                        @change=${this._handleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </th>
+                  `
+                : nothing}
+              ${this._visibleColumns.map(
                 (column) => html`
                   <th
                     class=${classMap({
                       sortable: !!column.sortable,
                       sorted: this._sortColumn === column.key,
                       [column.align || "left"]: true,
+                      [column.type || ""]: true,
                     })}
-                    style=${column.width ? `width: ${column.width}` : ""}
+                    style=${styleMap({
+                      width: column.width || "auto",
+                      minWidth: column.minWidth || "auto",
+                      maxWidth: column.maxWidth || "none",
+                      flex: column.flex ? String(column.flex) : "auto",
+                    })}
                     @click=${() => this._handleSort(column)}
                   >
                     <div class="header-content">
-                      <span>${column.title}</span>
-                      ${column.sortable
+                      <span class="header-text">${column.title}</span>
+                      ${column.sortable && this._sortColumn === column.key
                         ? html`
-                            <svg
-                              class="sort-icon ${this._sortColumn === column.key
-                                ? this._sortDirection!
-                                : ""}"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                d="M7 10l5 5 5-5"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                              />
-                            </svg>
+                            <ha-svg-icon
+                              class="sort-icon"
+                              .path=${this._sortDirection === "desc"
+                                ? "M7 10l5 5 5-5"
+                                : "M7 14l5-5 5 5"}
+                            ></ha-svg-icon>
                           `
-                        : ""}
+                        : nothing}
                     </div>
                   </th>
                 `
@@ -152,18 +249,45 @@ export class ESPHomeDataTable extends LitElement {
               (row) => row.id || row.name || JSON.stringify(row),
               (row) => html`
                 <tr
-                  class=${classMap({ clickable: this.clickable })}
-                  @click=${() => this._handleRowClick(row)}
+                  class=${classMap({ 
+                    clickable: this.clickable,
+                    selected: this._selectedRows.has(row[this.id])
+                  })}
+                  @click=${(e: Event) => this._handleRowClick(row, e)}
                 >
-                  ${this.columns.map((column) => {
+                  ${this.selectable
+                    ? html`
+                        <td class="checkbox-cell">
+                          ${row.selectable !== false
+                            ? html`
+                                <input
+                                  type="checkbox"
+                                  .checked=${this._selectedRows.has(row[this.id])}
+                                  @change=${(e: Event) => 
+                                    this._handleRowSelection(row, (e.target as HTMLInputElement).checked)
+                                  }
+                                  aria-label="Select row"
+                                />
+                              `
+                            : nothing}
+                        </td>
+                      `
+                    : nothing}
+                  ${this._visibleColumns.map((column) => {
                     const value = row[column.key];
                     const content = column.template
                       ? column.template(value, row)
                       : value;
 
                     return html`
-                      <td class=${column.align || "left"}>
-                        ${content}
+                      <td class="${classMap({
+                        [column.align || "left"]: true,
+                        [column.type || ""]: true,
+                      })}">
+                        <div class="cell-content">
+                          ${content}
+                          ${column.extraTemplate ? column.extraTemplate(value, row) : nothing}
+                        </div>
                       </td>
                     `;
                   })}
@@ -176,50 +300,71 @@ export class ESPHomeDataTable extends LitElement {
     `;
   }
 
-  static styles = css`
+  static styles = [haTheme, haCommonStyles, css`
     :host {
       display: block;
       width: 100%;
+      --data-table-row-height: var(--esphome-table-row-height);
     }
 
     .table-wrapper {
+      position: relative;
       width: 100%;
       overflow-x: auto;
-      background: var(--esphome-table-background, #ffffff);
-      border-radius: var(--esphome-border-radius, 4px);
-      box-shadow: var(--esphome-box-shadow, 0 1px 3px rgba(0, 0, 0, 0.1));
+      background: var(--esphome-table-background);
+      border-radius: var(--esphome-border-radius);
+      box-shadow: var(--esphome-box-shadow);
+    }
+
+    .table-wrapper.narrow {
+      --data-table-row-height: 72px;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 14px;
+      font-size: var(--esphome-font-size-m);
+      font-family: var(--esphome-font-family);
     }
 
     thead {
-      background: var(--esphome-table-header-background, #fafafa);
-      border-bottom: 1px solid var(--esphome-border-color, #e0e0e0);
+      background: var(--esphome-table-header-background);
+      border-bottom: 1px solid var(--esphome-border-color);
+    }
+
+    thead tr {
+      height: var(--esphome-table-header-height);
     }
 
     th {
-      padding: 12px 16px;
+      padding: 0 var(--esphome-spacing-m);
       text-align: left;
-      font-weight: 500;
-      color: var(--esphome-text-secondary, #666666);
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      font-weight: var(--esphome-font-weight-medium);
+      color: var(--esphome-text-secondary);
+      font-size: var(--esphome-font-size-s);
+      line-height: var(--esphome-line-height-normal);
       user-select: none;
       white-space: nowrap;
+      vertical-align: middle;
+    }
+
+    th.checkbox-cell {
+      width: var(--esphome-table-checkbox-cell-width);
+      padding: 0;
+      text-align: center;
+    }
+
+    th.icon {
+      width: var(--esphome-table-icon-cell-width);
     }
 
     th.sortable {
       cursor: pointer;
-      transition: background-color 0.2s;
+      position: relative;
     }
 
     th.sortable:hover {
-      background-color: var(--esphome-table-hover, rgba(0, 0, 0, 0.04));
+      color: var(--esphome-text-primary);
     }
 
     th.center {
@@ -233,26 +378,37 @@ export class ESPHomeDataTable extends LitElement {
     .header-content {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: var(--esphome-spacing-xs);
+      justify-content: space-between;
+    }
+
+    .header-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
     }
 
     .sort-icon {
-      color: var(--esphome-text-secondary, #666666);
-      transition: transform 0.2s, opacity 0.2s;
-      opacity: 0.3;
+      color: var(--esphome-text-secondary);
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
     }
 
-    th.sorted .sort-icon {
-      opacity: 1;
-    }
-
-    .sort-icon.desc {
-      transform: rotate(180deg);
+    ha-svg-icon {
+      display: inline-flex;
+      width: 24px;
+      height: 24px;
     }
 
     tbody tr {
-      border-bottom: 1px solid var(--esphome-border-color, #e0e0e0);
-      transition: background-color 0.2s;
+      height: var(--data-table-row-height);
+      border-bottom: 1px solid var(--esphome-border-color);
+      transition: background-color var(--esphome-transition-duration) var(--esphome-transition-timing);
+    }
+
+    tbody tr.selected {
+      background-color: rgba(var(--rgb-primary-color, 3, 169, 244), 0.12);
     }
 
     tbody tr:last-child {
@@ -260,7 +416,11 @@ export class ESPHomeDataTable extends LitElement {
     }
 
     tbody tr:hover {
-      background-color: var(--esphome-table-hover, rgba(0, 0, 0, 0.02));
+      background-color: var(--esphome-hover-background);
+    }
+
+    tbody tr.selected:hover {
+      background-color: rgba(var(--rgb-primary-color, 3, 169, 244), 0.18);
     }
 
     tbody tr.clickable {
@@ -268,9 +428,27 @@ export class ESPHomeDataTable extends LitElement {
     }
 
     td {
-      padding: 12px 16px;
-      color: var(--esphome-text-primary, #212121);
+      padding: var(--esphome-spacing-s) var(--esphome-spacing-m);
+      color: var(--esphome-text-primary);
       vertical-align: middle;
+      overflow: hidden;
+    }
+
+    td.checkbox-cell {
+      width: var(--esphome-table-checkbox-cell-width);
+      padding: 0;
+      text-align: center;
+    }
+
+    td.icon {
+      width: var(--esphome-table-icon-cell-width);
+      padding: var(--esphome-spacing-s);
+    }
+
+    .cell-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--esphome-spacing-xs);
     }
 
     td.center {
@@ -282,46 +460,80 @@ export class ESPHomeDataTable extends LitElement {
     }
 
     .no-data {
-      padding: 48px 24px;
+      padding: var(--esphome-spacing-xl) var(--esphome-spacing-l);
       text-align: center;
-      color: var(--esphome-text-secondary, #666666);
-      background: var(--esphome-table-background, #ffffff);
-      border-radius: var(--esphome-border-radius, 4px);
-      box-shadow: var(--esphome-box-shadow, 0 1px 3px rgba(0, 0, 0, 0.1));
+      color: var(--esphome-text-secondary);
+      background: var(--esphome-table-background);
+      border-radius: var(--esphome-border-radius);
+      box-shadow: var(--esphome-box-shadow);
     }
 
     .no-data p {
       margin: 0;
-      font-size: 14px;
+      font-size: var(--esphome-font-size-m);
     }
 
-    /* Dark mode support */
-    @media (prefers-color-scheme: dark) {
-      :host {
-        --esphome-table-background: #1e1e1e;
-        --esphome-table-header-background: #2a2a2a;
-        --esphome-border-color: #404040;
-        --esphome-text-primary: #e0e0e0;
-        --esphome-text-secondary: #999999;
-        --esphome-table-hover: rgba(255, 255, 255, 0.05);
-      }
+    /* Checkbox styling */
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      margin: 0;
+    }
+
+    /* Scrollbar styling */
+    .table-wrapper::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    .table-wrapper::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .table-wrapper::-webkit-scrollbar-thumb {
+      background: var(--esphome-border-color);
+      border-radius: 4px;
+    }
+
+    .table-wrapper::-webkit-scrollbar-thumb:hover {
+      background: var(--esphome-text-secondary);
     }
 
     /* Responsive */
     @media (max-width: 768px) {
+      :host {
+        --data-table-row-height: 60px;
+      }
+      
       th, td {
-        padding: 8px 12px;
+        padding: var(--esphome-spacing-s) var(--esphome-spacing-s);
       }
       
       th {
-        font-size: 11px;
+        font-size: var(--esphome-font-size-xs);
       }
       
       td {
-        font-size: 13px;
+        font-size: var(--esphome-font-size-s);
       }
     }
-  `;
+  `];
+
+  connectedCallback() {
+    super.connectedCallback();
+    if (this.initialCollapsedGroups) {
+      this._collapsedGroups = [...this.initialCollapsedGroups];
+    }
+  }
+
+  updated(changedProperties: PropertyValues) {
+    super.updated(changedProperties);
+    
+    if (changedProperties.has('filter') && this.filter !== this._filter) {
+      this._debounceFilter(this.filter);
+    }
+  }
 }
 
 declare global {

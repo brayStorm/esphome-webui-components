@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESPHome WebUI Components - Demo</title>
+    <style>
+        body {
+            font-family: Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #fafafa;
+        }
+        
+        .demo-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .demo-section {
+            margin-bottom: 32px;
+        }
+        
+        .demo-controls {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .demo-controls search-input {
+            min-width: 300px;
+        }
+        
+        h1, h2 {
+            color: #212121;
+        }
+    </style>
+    <script type="module">
+        import './dist/index.js';
+        
+        // Sample data for the demo
+        const sampleData = [
+            { id: 'esp1', name: 'Living Room Sensor', status: 'online', type: 'ESP32', area: 'Living Room', ip: '192.168.1.101' },
+            { id: 'esp2', name: 'Kitchen Light', status: 'offline', type: 'ESP8266', area: 'Kitchen', ip: '192.168.1.102' },
+            { id: 'esp3', name: 'Bedroom Climate', status: 'updating', type: 'ESP32', area: 'Bedroom', ip: '192.168.1.103' },
+            { id: 'esp4', name: 'Garage Door', status: 'online', type: 'ESP8266', area: 'Garage', ip: '192.168.1.104' },
+            { id: 'esp5', name: 'Garden Irrigation', status: 'discovered', type: 'ESP32', area: 'Garden', ip: '192.168.1.105' },
+            { id: 'esp6', name: 'Office Desk Light', status: 'online', type: 'ESP32', area: 'Office', ip: '192.168.1.106' },
+            { id: 'esp7', name: 'Bathroom Fan', status: 'unavailable', type: 'ESP8266', area: 'Bathroom', ip: '192.168.1.107' },
+            { id: 'esp8', name: 'Front Door Bell', status: 'online', type: 'ESP32', area: 'Entrance', ip: '192.168.1.108' },
+        ];
+        
+        const columns = [
+            {
+                key: 'status',
+                title: 'Status',
+                type: 'icon',
+                width: '80px',
+                template: (value) => `<esphome-status-indicator status="${value}"></esphome-status-indicator>`
+            },
+            {
+                key: 'name',
+                title: 'Name',
+                sortable: true,
+                filterable: true
+            },
+            {
+                key: 'type',
+                title: 'Type',
+                sortable: true,
+                groupable: true,
+                width: '120px'
+            },
+            {
+                key: 'area',
+                title: 'Area',
+                sortable: true,
+                groupable: true,
+                width: '140px'
+            },
+            {
+                key: 'ip',
+                title: 'IP Address',
+                align: 'right',
+                width: '140px'
+            },
+            {
+                key: 'actions',
+                title: 'Actions',
+                type: 'overflow-menu',
+                width: '80px',
+                template: () => `
+                    <esphome-action-menu>
+                    </esphome-action-menu>
+                `
+            }
+        ];
+        
+        // Wait for components to be defined
+        await customElements.whenDefined('esphome-data-table');
+        await customElements.whenDefined('search-input');
+        await customElements.whenDefined('esphome-button');
+        
+        // Initialize the demo
+        function initDemo() {
+            const table = document.querySelector('#demo-table');
+            const searchInput = document.querySelector('#search-input');
+            const groupBySelect = document.querySelector('#group-by');
+            const toggleGroupsBtn = document.querySelector('#toggle-groups');
+            
+            // Set up table
+            table.columns = columns;
+            table.data = sampleData;
+            table.selectable = true;
+            table.clickable = true;
+            
+            // Set up search
+            searchInput.addEventListener('value-changed', (e) => {
+                table.filter = e.detail.value;
+            });
+            
+            // Set up grouping
+            groupBySelect.addEventListener('change', (e) => {
+                table.groupColumn = e.target.value || undefined;
+            });
+            
+            // Set up group toggle
+            let allExpanded = true;
+            toggleGroupsBtn.addEventListener('click', () => {
+                if (allExpanded) {
+                    table.collapseAllGroups();
+                    toggleGroupsBtn.textContent = 'Expand All Groups';
+                } else {
+                    table.expandAllGroups();
+                    toggleGroupsBtn.textContent = 'Collapse All Groups';
+                }
+                allExpanded = !allExpanded;
+            });
+            
+            // Listen to table events
+            table.addEventListener('row-click', (e) => {
+                console.log('Row clicked:', e.detail);
+            });
+            
+            table.addEventListener('selection-changed', (e) => {
+                console.log('Selection changed:', e.detail.value);
+            });
+            
+            table.addEventListener('sorting-changed', (e) => {
+                console.log('Sorting changed:', e.detail);
+            });
+            
+            table.addEventListener('collapsed-changed', (e) => {
+                console.log('Groups collapsed:', e.detail.value);
+            });
+        }
+        
+        // Initialize when DOM is loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initDemo);
+        } else {
+            initDemo();
+        }
+    </script>
+</head>
+<body>
+    <div class="demo-container">
+        <h1>ESPHome WebUI Components Demo</h1>
+        
+        <div class="demo-section">
+            <h2>Data Table with Grouping and Filtering</h2>
+            
+            <div class="demo-controls">
+                <search-input 
+                    id="search-input" 
+                    label="Search devices"
+                    placeholder="Search by name, type, or area..."
+                ></search-input>
+                
+                <select id="group-by">
+                    <option value="">No Grouping</option>
+                    <option value="type">Group by Type</option>
+                    <option value="area">Group by Area</option>
+                    <option value="status">Group by Status</option>
+                </select>
+                
+                <esphome-button 
+                    id="toggle-groups" 
+                    label="Collapse All Groups"
+                    variant="secondary"
+                ></esphome-button>
+            </div>
+            
+            <esphome-data-table id="demo-table"></esphome-data-table>
+        </div>
+        
+        <div class="demo-section">
+            <h2>Button Variants</h2>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                <esphome-button label="Primary" variant="primary"></esphome-button>
+                <esphome-button label="Secondary" variant="secondary"></esphome-button>
+                <esphome-button label="Text" variant="text"></esphome-button>
+                <esphome-button label="Warning" variant="warning"></esphome-button>
+                <esphome-button label="Danger" variant="danger"></esphome-button>
+                <esphome-button label="Disabled" variant="primary" disabled></esphome-button>
+            </div>
+        </div>
+        
+        <div class="demo-section">
+            <h2>Status Indicators</h2>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                <esphome-status-indicator status="online"></esphome-status-indicator>
+                <esphome-status-indicator status="offline"></esphome-status-indicator>
+                <esphome-status-indicator status="updating"></esphome-status-indicator>
+                <esphome-status-indicator status="discovered"></esphome-status-indicator>
+                <esphome-status-indicator status="unavailable"></esphome-status-indicator>
+                <esphome-status-indicator status="unknown"></esphome-status-indicator>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

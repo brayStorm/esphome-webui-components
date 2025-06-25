@@ -1,14 +1,16 @@
 import { LitElement, html, css } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
+import { haTheme, haCommonStyles } from "./ha-theme.js";
 
-export type StatusType = "online" | "offline" | "discovered" | "updating" | "unknown";
+export type StatusType = "online" | "offline" | "discovered" | "updating" | "unknown" | "unavailable" | "disabled" | "readonly";
 
 @customElement("esphome-status-indicator")
 export class ESPHomeStatusIndicator extends LitElement {
   @property() public status: StatusType = "unknown";
   @property({ type: Boolean }) public showText = true;
   @property() public text?: string;
+  @property({ type: Boolean }) public small = false;
 
   private _getStatusText(): string {
     if (this.text) return this.text;
@@ -22,6 +24,12 @@ export class ESPHomeStatusIndicator extends LitElement {
         return "Discovered";
       case "updating":
         return "Updating";
+      case "unavailable":
+        return "Unavailable";
+      case "disabled":
+        return "Disabled";
+      case "readonly":
+        return "Read-only";
       default:
         return "Unknown";
     }
@@ -29,7 +37,10 @@ export class ESPHomeStatusIndicator extends LitElement {
 
   protected render() {
     return html`
-      <div class="status-container ${this.status}">
+      <div class="status-container ${classMap({
+        [this.status]: true,
+        small: this.small
+      })}">
         <span class="status-dot"></span>
         ${this.showText
           ? html`<span class="status-text">${this._getStatusText()}</span>`
@@ -38,7 +49,7 @@ export class ESPHomeStatusIndicator extends LitElement {
     `;
   }
 
-  static styles = css`
+  static styles = [haTheme, haCommonStyles, css`
     :host {
       display: inline-block;
     }
@@ -46,79 +57,125 @@ export class ESPHomeStatusIndicator extends LitElement {
     .status-container {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: var(--esphome-spacing-s);
+    }
+
+    .status-container.small {
+      gap: var(--esphome-spacing-xs);
     }
 
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       flex-shrink: 0;
       position: relative;
+      box-shadow: 0 0 0 1px transparent;
+      transition: background-color var(--esphome-transition-duration) var(--esphome-transition-timing),
+                  box-shadow var(--esphome-transition-duration) var(--esphome-transition-timing);
+    }
+
+    .small .status-dot {
+      width: 8px;
+      height: 8px;
     }
 
     .status-text {
-      font-size: 12px;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      line-height: 1;
+      font-size: var(--esphome-font-size-s);
+      font-weight: var(--esphome-font-weight-medium);
+      line-height: var(--esphome-line-height-condensed);
+      color: var(--esphome-text-secondary);
+    }
+
+    .small .status-text {
+      font-size: var(--esphome-font-size-xs);
     }
 
     /* Status colors */
     .online .status-dot {
-      background-color: var(--esphome-status-online, #4caf50);
-    }
-
-    .online .status-text {
-      color: var(--esphome-status-online, #4caf50);
+      background-color: var(--esphome-status-online);
     }
 
     .offline .status-dot {
-      background-color: var(--esphome-status-offline, #f44336);
-    }
-
-    .offline .status-text {
-      color: var(--esphome-status-offline, #f44336);
+      background-color: var(--esphome-status-offline);
     }
 
     .discovered .status-dot {
-      background-color: var(--esphome-status-discovered, #2196f3);
-    }
-
-    .discovered .status-text {
-      color: var(--esphome-status-discovered, #2196f3);
+      background-color: var(--esphome-status-discovered);
     }
 
     .updating .status-dot {
-      background-color: var(--esphome-status-updating, #ff9800);
+      background-color: var(--esphome-status-updating);
       animation: pulse 1.5s ease-in-out infinite;
     }
 
-    .updating .status-text {
-      color: var(--esphome-status-updating, #ff9800);
+    .updating .status-dot::before {
+      content: "";
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      right: -2px;
+      bottom: -2px;
+      border-radius: 50%;
+      background-color: var(--esphome-status-updating);
+      opacity: 0.3;
+      animation: ripple 1.5s ease-in-out infinite;
+    }
+
+    .unavailable .status-dot {
+      background-color: var(--esphome-status-offline);
+      opacity: 0.5;
+    }
+
+    .disabled .status-dot {
+      background-color: var(--esphome-text-disabled);
+    }
+
+    .readonly .status-dot {
+      background-color: var(--esphome-info-color);
+      opacity: 0.7;
     }
 
     .unknown .status-dot {
-      background-color: var(--esphome-status-unknown, #9e9e9e);
-    }
-
-    .unknown .status-text {
-      color: var(--esphome-status-unknown, #9e9e9e);
+      background-color: var(--esphome-status-unknown);
     }
 
     @keyframes pulse {
       0% {
         opacity: 1;
+        transform: scale(1);
       }
       50% {
-        opacity: 0.4;
+        opacity: 0.6;
+        transform: scale(0.95);
       }
       100% {
         opacity: 1;
+        transform: scale(1);
       }
     }
-  `;
+
+    @keyframes ripple {
+      0% {
+        transform: scale(1);
+        opacity: 0.3;
+      }
+      100% {
+        transform: scale(1.5);
+        opacity: 0;
+      }
+    }
+
+    /* Icon mode - when used in icon columns */
+    :host([icon]) .status-container {
+      justify-content: center;
+    }
+
+    :host([icon]) .status-dot {
+      width: 24px;
+      height: 24px;
+    }
+  `];
 }
 
 declare global {
