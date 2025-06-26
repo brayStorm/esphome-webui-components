@@ -91,10 +91,9 @@ export class ESPHomeActionMenu extends LitElement {
                           >
                             ${item.icon
                               ? html`
-                                  <ha-svg-icon
-                                    class="menu-icon"
-                                    .path=${item.icon}
-                                  ></ha-svg-icon>
+                                  <mwc-icon class="menu-icon">
+                                    ${item.icon}
+                                  </mwc-icon>
                                 `
                               : nothing}
                             <span class="menu-label">${item.label}</span>
@@ -139,8 +138,13 @@ export class ESPHomeActionMenu extends LitElement {
       height: 36px;
     }
 
-    .menu-trigger ha-svg-icon {
+    .menu-trigger mwc-icon {
       --mdc-icon-size: 24px;
+    }
+    
+    .menu-icon {
+      --mdc-icon-size: 20px;
+      margin-right: var(--esphome-spacing-s);
     }
 
     .menu-trigger:hover {

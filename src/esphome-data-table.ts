@@ -40,11 +40,13 @@ export class ESPHomeDataTable extends LitElement {
   @property({ type: Boolean }) public narrow = false;
   @property({ type: Boolean, attribute: "auto-height" }) public autoHeight = false;
   @property() public noDataText = "No data";
-  @property() public id = "id";
+  @property() public id = "name";
   @property({ attribute: false }) public hiddenColumns?: string[];
   @property({ attribute: false }) public groupColumn?: string;
   @property({ attribute: false }) public groupOrder?: string[];
   @property({ attribute: false }) public initialCollapsedGroups?: string[];
+  @property() public sortColumn?: string;
+  @property() public sortDirection?: "asc" | "desc";
   @state() private _sortColumn?: string;
   @state() private _sortDirection?: "asc" | "desc" | null = null;
   @state() private _selectedRows = new Set<string>();
@@ -162,8 +164,16 @@ export class ESPHomeDataTable extends LitElement {
     // Apply sort
     if (this._sortColumn && this._sortDirection) {
       filtered.sort((a, b) => {
-        const aVal = a[this._sortColumn!];
-        const bVal = b[this._sortColumn!];
+        let aVal = a[this._sortColumn!];
+        let bVal = b[this._sortColumn!];
+        
+        // Handle special status sorting
+        if (this._sortColumn === 'status') {
+          // Convert status to sortable values
+          const statusOrder = { 'online': 1, 'offline': 2, 'discovered': 3, 'update-available': 4, 'updating': 5 };
+          aVal = statusOrder[aVal as string] || 99;
+          bVal = statusOrder[bVal as string] || 99;
+        }
         
         // Handle numeric sorting
         const aNum = Number(aVal);
@@ -258,12 +268,12 @@ export class ESPHomeDataTable extends LitElement {
           <tbody>
             ${repeat(
               filteredData,
-              (row) => row.id || row.name || JSON.stringify(row),
+              (row) => row[this.id] || row.name || JSON.stringify(row),
               (row) => html`
                 <tr
                   class=${classMap({ 
                     clickable: this.clickable,
-                    selected: this._selectedRows.has(row[this.id])
+                    selected: this._selectedRows.has(row.name || row[this.id])
                   })}
                   @click=${(e: Event) => this._handleRowClick(row, e)}
                 >
@@ -274,7 +284,7 @@ export class ESPHomeDataTable extends LitElement {
                             ? html`
                                 <input
                                   type="checkbox"
-                                  .checked=${this._selectedRows.has(row[this.id])}
+                                  .checked=${this._selectedRows.has(row.name || row[this.id])}
                                   @change=${(e: Event) => 
                                     this._handleRowSelection(row, (e.target as HTMLInputElement).checked)
                                   }
@@ -341,62 +351,64 @@ export class ESPHomeDataTable extends LitElement {
               ${!isCollapsed ? html`
                 <div class="table-wrapper ${classMap({ narrow: this.narrow })}">
                   <table>
-                    <thead>
-                      <tr>
-                        ${this.selectable
-                          ? html`
-                              <th class="checkbox-cell">
-                                <input
-                                  type="checkbox"
-                                  .checked=${this._isAllSelected()}
-                                  .indeterminate=${this._isSomeSelected()}
-                                  @change=${this._handleSelectAll}
-                                  aria-label="Select all"
-                                />
+                    ${groupKeys.length > 1 ? html`
+                      <thead>
+                        <tr>
+                          ${this.selectable
+                            ? html`
+                                <th class="checkbox-cell">
+                                  <input
+                                    type="checkbox"
+                                    .checked=${this._isAllSelected()}
+                                    .indeterminate=${this._isSomeSelected()}
+                                    @change=${this._handleSelectAll}
+                                    aria-label="Select all"
+                                  />
+                                </th>
+                              `
+                            : nothing}
+                          ${this._visibleColumns.map(
+                            (column) => html`
+                              <th
+                                class=${classMap({
+                                  sortable: !!column.sortable,
+                                  sorted: this._sortColumn === column.key,
+                                  [column.align || "left"]: true,
+                                  [column.type || ""]: true,
+                                })}
+                                style=${styleMap({
+                                  width: column.width || "auto",
+                                  minWidth: column.minWidth || "auto",
+                                  maxWidth: column.maxWidth || "none",
+                                  flex: column.flex ? String(column.flex) : "auto",
+                                })}
+                                @click=${() => this._handleSort(column)}
+                              >
+                                <div class="header-content">
+                                  <span class="header-text">${column.title}</span>
+                                  ${column.sortable && this._sortColumn === column.key
+                                    ? html`
+                                        <mwc-icon class="sort-icon">
+                                          ${this._sortDirection === "desc" ? "arrow_downward" : "arrow_upward"}
+                                        </mwc-icon>
+                                      `
+                                    : nothing}
+                                </div>
                               </th>
                             `
-                          : nothing}
-                        ${this._visibleColumns.map(
-                          (column) => html`
-                            <th
-                              class=${classMap({
-                                sortable: !!column.sortable,
-                                sorted: this._sortColumn === column.key,
-                                [column.align || "left"]: true,
-                                [column.type || ""]: true,
-                              })}
-                              style=${styleMap({
-                                width: column.width || "auto",
-                                minWidth: column.minWidth || "auto",
-                                maxWidth: column.maxWidth || "none",
-                                flex: column.flex ? String(column.flex) : "auto",
-                              })}
-                              @click=${() => this._handleSort(column)}
-                            >
-                              <div class="header-content">
-                                <span class="header-text">${column.title}</span>
-                                ${column.sortable && this._sortColumn === column.key
-                                  ? html`
-                                      <mwc-icon class="sort-icon">
-                                        ${this._sortDirection === "desc" ? "arrow_downward" : "arrow_upward"}
-                                      </mwc-icon>
-                                    `
-                                  : nothing}
-                              </div>
-                            </th>
-                          `
-                        )}
-                      </tr>
-                    </thead>
+                          )}
+                        </tr>
+                      </thead>
+                    ` : nothing}
                     <tbody>
                       ${repeat(
                         groupRows,
-                        (row) => row.id || row.name || JSON.stringify(row),
+                        (row) => row[this.id] || row.name || JSON.stringify(row),
                         (row) => html`
                           <tr
                             class=${classMap({ 
                               clickable: this.clickable,
-                              selected: this._selectedRows.has(row[this.id])
+                              selected: this._selectedRows.has(row.name || row[this.id])
                             })}
                             @click=${(e: Event) => this._handleRowClick(row, e)}
                           >
@@ -407,7 +419,7 @@ export class ESPHomeDataTable extends LitElement {
                                       ? html`
                                           <input
                                             type="checkbox"
-                                            .checked=${this._selectedRows.has(row[this.id])}
+                                            .checked=${this._selectedRows.has(row.name || row[this.id])}
                                             @change=${(e: Event) => 
                                               this._handleRowSelection(row, (e.target as HTMLInputElement).checked)
                                             }
@@ -728,6 +740,15 @@ export class ESPHomeDataTable extends LitElement {
     if (changedProperties.has('filter') && this.filter !== this._filter) {
       this._debounceFilter(this.filter);
     }
+    
+    // Sync external sort properties
+    if (changedProperties.has('sortColumn') && this.sortColumn !== this._sortColumn) {
+      this._sortColumn = this.sortColumn;
+    }
+    
+    if (changedProperties.has('sortDirection') && this.sortDirection !== this._sortDirection) {
+      this._sortDirection = this.sortDirection;
+    }
   }
 
   private _getGroupedData(): Record<string, DataTableRow[]> {
@@ -739,7 +760,28 @@ export class ESPHomeDataTable extends LitElement {
     const grouped: Record<string, DataTableRow[]> = {};
 
     filtered.forEach((row) => {
-      const groupValue = String(row[this.groupColumn!] || 'Other');
+      let groupValue = String(row[this.groupColumn!] || 'Other');
+      
+      // Handle special grouping cases
+      if (this.groupColumn === 'status') {
+        // Convert status values to readable names
+        const statusMap: Record<string, string> = {
+          'online': 'Online',
+          'offline': 'Offline', 
+          'discovered': 'Discovered',
+          'update-available': 'Update Available',
+          'updating': 'Updating'
+        };
+        groupValue = statusMap[groupValue] || groupValue;
+      } else if (this.groupColumn === 'deviceType') {
+        // Convert device type to readable names
+        const typeMap: Record<string, string> = {
+          'configured': 'Your Devices',
+          'discovered': 'Discovered Devices'
+        };
+        groupValue = typeMap[groupValue] || groupValue;
+      }
+      
       if (!grouped[groupValue]) {
         grouped[groupValue] = [];
       }
