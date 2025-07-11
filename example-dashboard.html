@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESPHome Dashboard Example</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&family=Roboto+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Roboto, sans-serif;
+      background-color: #f5f5f5;
+    }
+  </style>
+</head>
+<body>
+  <esphome-dashboard id="dashboard"></esphome-dashboard>
+
+  <script type="module">
+    import './dist/index.js';
+    
+    // Example device data matching the mockup
+    const mockDevices = [
+      {
+        id: "bathroom-env-sensor",
+        name: "Bathroom Environmental Sensor",
+        type: "Apollo AIR-1",
+        icon: "sensor",
+        status: "online",
+        fileName: "apollo-msr-2-2b7004.yaml",
+        discovered: false
+      },
+      {
+        id: "bedroom-presence-sensor",
+        name: "Bedroom Presence Sensor",
+        type: "Apollo MTR-1",
+        icon: "sensor",
+        status: "online",
+        fileName: "bedroom-presence-sensor.yaml",
+        discovered: false
+      },
+      {
+        id: "bibo",
+        name: "Bibo",
+        type: "Nabu Casa Home Assistant Voice PE",
+        icon: "voice",
+        status: "online",
+        updateAvailable: true,
+        fileName: "ha-voice-8ab-e3f0cc.yaml",
+        discovered: false
+      },
+      {
+        id: "living-room-env-sensor",
+        name: "Living Room Environmental Sensor",
+        type: "Apollo AIR-1",
+        icon: "sensor",
+        status: "online",
+        fileName: "living-room-air-quality-sensor.yaml",
+        discovered: false
+      },
+      {
+        id: "living-room-presence-sensor",
+        name: "Living Room Presence Sensor",
+        type: "Apollo MTR-1",
+        icon: "sensor",
+        status: "online",
+        updateAvailable: true,
+        fileName: "apollo-mtr-1-c6585c.yaml",
+        discovered: false
+      },
+      {
+        id: "makery-vindriktning",
+        name: "Makery Vindriktning",
+        type: "",
+        icon: "sensor",
+        status: "offline",
+        fileName: "makery-vindriktning.yaml",
+        discovered: false
+      },
+      {
+        id: "weatherman",
+        name: "Weatherman",
+        type: "",
+        icon: "weather",
+        status: "online",
+        fileName: "apollo-msr-2-2b7004.yaml",
+        discovered: false
+      },
+      {
+        id: "home-assistant-voice-a21637",
+        name: "Home Assistant Voice a21637",
+        type: "Nabu Casa Home Assistant Voice PE",
+        icon: "voice",
+        status: "online",
+        fileName: "ha-voice-8ab-a3d538",
+        discovered: true
+      },
+      {
+        id: "home-assistant-pulse-b312e2",
+        name: "Home Assistant Pulse b312e2",
+        type: "Nabu Casa Home Assistant Pulse",
+        icon: "pulse",
+        status: "online",
+        fileName: "ha-pulse-b312e2",
+        discovered: true
+      }
+    ];
+    
+    const dashboard = document.getElementById('dashboard');
+    dashboard.devices = mockDevices;
+    
+    // Handle device actions
+    dashboard.addEventListener('device-action', (e) => {
+      console.log('Device action:', e.detail.action, 'for device:', e.detail.device.name);
+    });
+  </script>
+</body>
+</html>

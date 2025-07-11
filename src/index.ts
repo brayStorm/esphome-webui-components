@@ -17,3 +17,6 @@ export { SearchInput } from './search-input.js';
 export { haTheme, haCommonStyles } from './ha-theme.js';
 
 export { debounce, stringCompare, groupBy } from './utils.js';
+
+export { ESPHomeDashboard } from './esphome-dashboard.js';
+export type { ESPHomeDevice } from './esphome-dashboard.js';

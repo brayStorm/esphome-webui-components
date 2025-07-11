@@ -44,6 +44,7 @@ export class ESPHomeDataTable extends LitElement {
   @property({ attribute: false }) public hiddenColumns?: string[];
   @property({ attribute: false }) public groupColumn?: string;
   @property({ attribute: false }) public groupOrder?: string[];
+  @property({ attribute: false }) public groupHeaders?: { [key: string]: string };
   @property({ attribute: false }) public initialCollapsedGroups?: string[];
   @property() public sortColumn?: string;
   @property() public sortDirection?: "asc" | "desc";
@@ -343,10 +344,8 @@ export class ESPHomeDataTable extends LitElement {
           return html`
             <div class="group-section">
               <div class="group-header" @click=${() => this._toggleGroup(groupKey)}>
-                <mwc-icon class="expand-icon ${classMap({ collapsed: isCollapsed })}">
-                  ${isCollapsed ? "expand_more" : "expand_less"}
-                </mwc-icon>
-                <span class="group-title">${groupKey} (${groupRows.length})</span>
+                <mwc-icon class="expand-icon ${isCollapsed ? 'collapsed' : ''}">expand_more</mwc-icon>
+                <span class="group-title">${this.groupHeaders?.[groupKey] || groupKey}</span>
               </div>
               ${!isCollapsed ? html`
                 <div class="table-wrapper ${classMap({ narrow: this.narrow })}">
@@ -466,16 +465,16 @@ export class ESPHomeDataTable extends LitElement {
     :host {
       display: block;
       width: 100%;
-      --data-table-row-height: var(--esphome-table-row-height);
+      --data-table-row-height: 72px;
     }
 
     .table-wrapper {
       position: relative;
       width: 100%;
       overflow-x: auto;
-      background: var(--esphome-table-background);
-      border-radius: var(--esphome-border-radius);
-      box-shadow: var(--esphome-box-shadow);
+      background: white;
+      border-radius: 0;
+      box-shadow: none;
     }
 
     .table-wrapper.narrow {
@@ -490,34 +489,35 @@ export class ESPHomeDataTable extends LitElement {
     }
 
     thead {
-      background: var(--esphome-table-header-background);
-      border-bottom: 1px solid var(--esphome-border-color);
+      background: #fafafa;
+      border-bottom: 1px solid #e0e0e0;
     }
 
     thead tr {
-      height: var(--esphome-table-header-height);
+      height: 48px;
     }
 
     th {
-      padding: 0 var(--esphome-spacing-m);
+      padding: 0 16px;
       text-align: left;
-      font-weight: var(--esphome-font-weight-medium);
-      color: var(--esphome-text-secondary);
-      font-size: var(--esphome-font-size-s);
-      line-height: var(--esphome-line-height-normal);
+      font-weight: 500;
+      color: #757575;
+      font-size: 12px;
+      line-height: 1.5;
       user-select: none;
       white-space: nowrap;
       vertical-align: middle;
+      text-transform: uppercase;
     }
 
     th.checkbox-cell {
-      width: var(--esphome-table-checkbox-cell-width);
+      width: 48px;
       padding: 0;
       text-align: center;
     }
 
     th.icon {
-      width: var(--esphome-table-icon-cell-width);
+      width: 50px;
     }
 
     th.sortable {
@@ -526,7 +526,8 @@ export class ESPHomeDataTable extends LitElement {
     }
 
     th.sortable:hover {
-      color: var(--esphome-text-primary);
+      color: #212121;
+      background: #f5f5f5;
     }
 
     th.center {
@@ -565,8 +566,8 @@ export class ESPHomeDataTable extends LitElement {
 
     tbody tr {
       height: var(--data-table-row-height);
-      border-bottom: 1px solid var(--esphome-border-color);
-      transition: background-color var(--esphome-transition-duration) var(--esphome-transition-timing);
+      border-bottom: 1px solid #f5f5f5;
+      transition: background-color 0.2s ease;
     }
 
     tbody tr.selected {
@@ -578,7 +579,7 @@ export class ESPHomeDataTable extends LitElement {
     }
 
     tbody tr:hover {
-      background-color: var(--esphome-hover-background);
+      background-color: #fafafa;
     }
 
     tbody tr.selected:hover {
@@ -590,21 +591,21 @@ export class ESPHomeDataTable extends LitElement {
     }
 
     td {
-      padding: var(--esphome-spacing-s) var(--esphome-spacing-m);
-      color: var(--esphome-text-primary);
+      padding: 16px;
+      color: #212121;
       vertical-align: middle;
       overflow: hidden;
     }
 
     td.checkbox-cell {
-      width: var(--esphome-table-checkbox-cell-width);
+      width: 48px;
       padding: 0;
       text-align: center;
     }
 
     td.icon {
-      width: var(--esphome-table-icon-cell-width);
-      padding: var(--esphome-spacing-s);
+      width: 50px;
+      padding: 8px;
     }
 
     .cell-content {
@@ -622,12 +623,12 @@ export class ESPHomeDataTable extends LitElement {
     }
 
     .no-data {
-      padding: var(--esphome-spacing-xl) var(--esphome-spacing-l);
+      padding: 48px 32px;
       text-align: center;
-      color: var(--esphome-text-secondary);
-      background: var(--esphome-table-background);
-      border-radius: var(--esphome-border-radius);
-      box-shadow: var(--esphome-box-shadow);
+      color: #757575;
+      background: white;
+      border-radius: 0;
+      box-shadow: none;
     }
 
     .no-data p {
@@ -670,25 +671,26 @@ export class ESPHomeDataTable extends LitElement {
     }
 
     .group-section {
-      background: var(--esphome-table-background);
-      border-radius: var(--esphome-border-radius);
-      box-shadow: var(--esphome-box-shadow);
+      background: white;
+      border-radius: 0;
+      box-shadow: none;
       overflow: hidden;
     }
 
     .group-header {
       display: flex;
       align-items: center;
-      gap: var(--esphome-spacing-s);
-      padding: var(--esphome-spacing-m) var(--esphome-spacing-l);
-      background: var(--esphome-table-header-background);
-      border-bottom: 1px solid var(--esphome-border-color);
+      gap: 8px;
+      padding: 12px 16px;
+      background: #f5f5f5;
+      border-bottom: 1px solid #e0e0e0;
       cursor: pointer;
-      transition: background-color var(--esphome-transition-duration) var(--esphome-transition-timing);
+      transition: background-color 0.2s ease;
+      font-weight: 500;
     }
 
     .group-header:hover {
-      background: var(--esphome-hover-background);
+      background: #eeeeee;
     }
 
     .expand-icon {
@@ -776,8 +778,8 @@ export class ESPHomeDataTable extends LitElement {
       } else if (this.groupColumn === 'deviceType') {
         // Convert device type to readable names
         const typeMap: Record<string, string> = {
-          'configured': 'Your Devices',
-          'discovered': 'Discovered Devices'
+          'configured': 'Your devices',
+          'discovered': 'Discovered'
         };
         groupValue = typeMap[groupValue] || groupValue;
       }

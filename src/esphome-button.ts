@@ -26,11 +26,11 @@ export class ESPHomeButton extends LitElement {
         @click=${this._handleClick}
       >
         ${this.icon
-          ? html`<ha-svg-icon class="icon" .path=${this.icon}></ha-svg-icon>`
+          ? html`<mwc-icon class="icon">${this.icon}</mwc-icon>`
           : ""}
         ${this.label ? html`<span class="label">${this.label}</span>` : ""}
         ${this.iconTrailing
-          ? html`<ha-svg-icon class="icon trailing" .path=${this.iconTrailing}></ha-svg-icon>`
+          ? html`<mwc-icon class="icon trailing">${this.iconTrailing}</mwc-icon>`
           : ""}
       </button>
     `;
@@ -62,7 +62,7 @@ export class ESPHomeButton extends LitElement {
       font-size: var(--esphome-font-size-m);
       font-weight: var(--esphome-font-weight-medium);
       line-height: var(--esphome-line-height-normal);
-      text-transform: uppercase;
+      text-transform: none;
       letter-spacing: 0.0892857143em;
       cursor: pointer;
       transition: background-color var(--esphome-transition-duration) var(--esphome-transition-timing),

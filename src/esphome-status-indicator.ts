@@ -36,12 +36,18 @@ export class ESPHomeStatusIndicator extends LitElement {
   }
 
   protected render() {
+    const showIcon = this.status === 'online' || this.status === 'offline';
     return html`
       <div class="status-container ${classMap({
         [this.status]: true,
         small: this.small
       })}">
         <span class="status-dot"></span>
+        ${showIcon ? html`
+          <mwc-icon class="status-icon">
+            ${this.status === 'online' ? 'check' : 'close'}
+          </mwc-icon>
+        ` : ''}
         ${this.showText
           ? html`<span class="status-text">${this._getStatusText()}</span>`
           : ""}
@@ -57,22 +63,22 @@ export class ESPHomeStatusIndicator extends LitElement {
     .status-container {
       display: inline-flex;
       align-items: center;
-      gap: var(--esphome-spacing-s);
+      gap: 4px;
     }
 
     .status-container.small {
-      gap: var(--esphome-spacing-xs);
+      gap: 2px;
     }
 
     .status-dot {
-      width: 10px;
-      height: 10px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       flex-shrink: 0;
       position: relative;
       box-shadow: 0 0 0 1px transparent;
-      transition: background-color var(--esphome-transition-duration) var(--esphome-transition-timing),
-                  box-shadow var(--esphome-transition-duration) var(--esphome-transition-timing);
+      transition: background-color 0.2s ease,
+                  box-shadow 0.2s ease;
     }
 
     .small .status-dot {
@@ -81,31 +87,49 @@ export class ESPHomeStatusIndicator extends LitElement {
     }
 
     .status-text {
-      font-size: var(--esphome-font-size-s);
-      font-weight: var(--esphome-font-weight-medium);
-      line-height: var(--esphome-line-height-condensed);
-      color: var(--esphome-text-secondary);
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 1.5;
+      color: #212121;
+    }
+    
+    .status-icon {
+      width: 18px;
+      height: 18px;
+      font-size: 18px;
+    }
+    
+    mwc-icon {
+      display: inline-flex;
     }
 
     .small .status-text {
-      font-size: var(--esphome-font-size-xs);
+      font-size: 12px;
     }
 
     /* Status colors */
     .online .status-dot {
-      background-color: var(--esphome-status-online);
+      background-color: #4caf50;
+    }
+    
+    .online .status-icon {
+      color: #4caf50;
     }
 
     .offline .status-dot {
-      background-color: var(--esphome-status-offline);
+      background-color: #f44336;
+    }
+    
+    .offline .status-icon {
+      color: #f44336;
     }
 
     .discovered .status-dot {
-      background-color: var(--esphome-status-discovered);
+      background-color: #03a9f4;
     }
 
     .updating .status-dot {
-      background-color: var(--esphome-status-updating);
+      background-color: #ff9800;
       animation: pulse 1.5s ease-in-out infinite;
     }
 
@@ -117,27 +141,27 @@ export class ESPHomeStatusIndicator extends LitElement {
       right: -2px;
       bottom: -2px;
       border-radius: 50%;
-      background-color: var(--esphome-status-updating);
+      background-color: #ff9800;
       opacity: 0.3;
       animation: ripple 1.5s ease-in-out infinite;
     }
 
     .unavailable .status-dot {
-      background-color: var(--esphome-status-offline);
+      background-color: #f44336;
       opacity: 0.5;
     }
 
     .disabled .status-dot {
-      background-color: var(--esphome-text-disabled);
+      background-color: #9e9e9e;
     }
 
     .readonly .status-dot {
-      background-color: var(--esphome-info-color);
+      background-color: #2196f3;
       opacity: 0.7;
     }
 
     .unknown .status-dot {
-      background-color: var(--esphome-status-unknown);
+      background-color: #9e9e9e;
     }
 
     @keyframes pulse {
