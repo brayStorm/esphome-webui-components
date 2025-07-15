@@ -60,10 +60,12 @@ export class ESPHomeDashboard extends LitElement {
           <mwc-icon class="esphome-header-icon">home</mwc-icon>
           <span>ESPHome Device Builder</span>
         </div>
-        <button class="esphome-create-button">
-          Create device
-        </button>
-        <mwc-icon-button icon="more_vert"></mwc-icon-button>
+        <div class="esphome-header-actions">
+          <button class="esphome-create-button">
+            Create device
+          </button>
+          <mwc-icon-button icon="more_vert"></mwc-icon-button>
+        </div>
       </div>
     `;
   }
@@ -78,14 +80,18 @@ export class ESPHomeDashboard extends LitElement {
         </button>
         
         <button class="esphome-view-toggle">
-          <mwc-icon>${this._viewMode === "list" ? "view_list" : "view_module"}</mwc-icon>
+          <mwc-icon>view_list</mwc-icon>
         </button>
         
-        <search-input
-          class="esphome-search-input"
-          placeholder="Search 8 ESPHome devices"
-          @value-changed=${this._handleSearch}
-        ></search-input>
+        <div class="esphome-search-container">
+          <mwc-icon class="esphome-search-icon">search</mwc-icon>
+          <input
+            type="text"
+            class="esphome-search-input"
+            placeholder="Search 8 ESPHome devices"
+            @input=${(e: Event) => this._searchQuery = (e.target as HTMLInputElement).value}
+          />
+        </div>
         
         <button class="esphome-dropdown">
           <span>Group by</span>
@@ -97,9 +103,11 @@ export class ESPHomeDashboard extends LitElement {
           <mwc-icon>arrow_drop_down</mwc-icon>
         </button>
         
-        <mwc-icon-button icon="view_list"></mwc-icon-button>
-        <mwc-icon-button icon="grid_view"></mwc-icon-button>
-        <mwc-icon-button icon="settings"></mwc-icon-button>
+        <div class="esphome-toolbar-icons">
+          <mwc-icon-button icon="view_list"></mwc-icon-button>
+          <mwc-icon-button icon="view_module"></mwc-icon-button>
+          <mwc-icon-button icon="settings"></mwc-icon-button>
+        </div>
       </div>
     `;
   }
@@ -175,6 +183,18 @@ export class ESPHomeDashboard extends LitElement {
     
     return html`
       <div class="esphome-device-section">
+        ${section === "your" && !collapsed ? html`
+          <div class="esphome-table-header">
+            <div class="esphome-header-cell name">
+              <span>Name</span>
+              <mwc-icon>arrow_downward</mwc-icon>
+            </div>
+            <div class="esphome-header-cell status">Status</div>
+            <div class="esphome-header-cell filename">File name</div>
+            <div class="esphome-header-cell actions"></div>
+          </div>
+        ` : nothing}
+        
         <div class="esphome-section-header" @click=${() => this._toggleSection(section)}>
           <mwc-icon class="esphome-expand-icon ${collapsed ? 'collapsed' : ''}">
             expand_more
@@ -237,6 +257,12 @@ export class ESPHomeDashboard extends LitElement {
       align-items: center;
       justify-content: space-between;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .esphome-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .esphome-header-title {
@@ -305,14 +331,85 @@ export class ESPHomeDashboard extends LitElement {
       min-height: 36px;
     }
 
-    search-input {
+    .esphome-search-container {
       flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+      background-color: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      padding: 0 12px;
+    }
+
+    .esphome-search-icon {
+      color: #757575;
+      margin-right: 8px;
+    }
+
+    .esphome-search-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 14px;
+      padding: 8px 0;
+      background: transparent;
+    }
+
+    .esphome-toolbar-icons {
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
 
     /* Content area */
     .esphome-content {
       background-color: white;
       min-height: calc(100vh - 200px);
+    }
+
+    /* Table header */
+    .esphome-table-header {
+      display: flex;
+      align-items: center;
+      padding: 12px 24px;
+      background-color: #fafafa;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 12px;
+      font-weight: 500;
+      color: #757575;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .esphome-header-cell {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .esphome-header-cell.name {
+      width: 56px;
+      margin-right: 16px;
+      flex: 1;
+      cursor: pointer;
+    }
+
+    .esphome-header-cell.name mwc-icon {
+      font-size: 16px;
+    }
+
+    .esphome-header-cell.status {
+      width: 150px;
+    }
+
+    .esphome-header-cell.filename {
+      flex: 0 0 200px;
+      margin-right: 16px;
+    }
+
+    .esphome-header-cell.actions {
+      width: 120px;
     }
 
     /* Device sections */
